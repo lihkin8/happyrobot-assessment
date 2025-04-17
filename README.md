@@ -6,15 +6,17 @@ This is a Node.js/Express service for handling truck loads and FMCSA data.
 
 - Docker
 - Node.js (for local development)
-- Google Cloud SDK (for Cloud Run)
 
-## Local Testing
+## Local Setup
 
-1. Create a `.env` file in the project root with your FMCSA API key:
+1. Create a `.env` file in the project root with your API keys:
 
    ```env
-   FMCSA_API_KEY=your_api_key_here
+   FMCSA_API_KEY=your_fmcsa_api_key_here
+   API_KEY=your_api_key_here
    ```
+
+   Note: The `API_KEY` is used for authentication. All API requests must include this key in the `X-API-KEY` header.
 
 2. Build the Docker image:
 
@@ -22,56 +24,48 @@ This is a Node.js/Express service for handling truck loads and FMCSA data.
    docker build -t happyrobot-assignment .
    ```
 
-3. Run the container, injecting env vars from `.env` without baking them into the image:
+3. Run the container locally:
 
    ```bash
    docker run --rm -p 8080:8080 --env-file .env happyrobot-assignment
    ```
 
-4. Verify endpoints:
+4. Verify the health endpoint:
 
    ```bash
    curl http://localhost:8080/health
-   curl http://localhost:8080/loads?origin=NY
    ```
 
-## Deploy to Cloud Run
-
-1. Configure project and region:
+5. Test protected endpoints (using your API key):
 
    ```bash
-   gcloud config set project YOUR_PROJECT_ID
-   gcloud config set run/region YOUR_REGION
+   curl -H "X-API-KEY: your_api_key_here" http://localhost:8080/loads/REF09460
    ```
 
-2. Build and submit image:
+   Or you can omit the REF prefix:
 
    ```bash
-   gcloud builds submit --tag gcr.io/$PROJECT_ID/happyrobot-assignment
+   curl -H "X-API-KEY: your_api_key_here" http://localhost:8080/loads/09460
    ```
 
-3. Deploy with FMCSA_API_KEY injected at runtime:
+## Cloud Deployment
 
-   ```bash
-   gcloud run deploy happyrobot-assignment \
-     --image gcr.io/$PROJECT_ID/happyrobot-assignment \
-     --platform managed \
-     --set-env-vars FMCSA_API_KEY=$FMCSA_API_KEY
-   ```
+For deploying to Google Cloud Run, follow the official guide:
+[Deploy a Node.js service to Cloud Run](https://cloud.google.com/run/docs/quickstarts/build-and-deploy/deploy-nodejs-service)
 
-### Using Secret Manager (optional)
+Remember to configure both environment variables (`FMCSA_API_KEY` and `API_KEY`) when deploying to Cloud Run.
 
-1. Create a secret in Secret Manager:
+Alternatively, you can use Google Cloud Secret Manager for more secure API key management:
 
-   ```bash
-   echo -n "$FMCSA_API_KEY" | gcloud secrets create FMCSA_API_KEY --data-file=-
-   ```
+```bash
+# Create secrets
+echo -n "your_fmcsa_api_key" | gcloud secrets create FMCSA_API_KEY --data-file=-
+echo -n "your_api_key" | gcloud secrets create API_KEY --data-file=-
 
-2. Deploy with secret injection:
+# Deploy with secrets
+gcloud run deploy happyrobot-assignment \
+  --image [YOUR-IMAGE-URL] \
+  --set-secrets FMCSA_API_KEY=FMCSA_API_KEY:latest,API_KEY=API_KEY:latest
+```
 
-   ```bash
-   gcloud run deploy happyrobot-assignment \
-     --image gcr.io/$PROJECT_ID/happyrobot-assignment \
-     --platform managed \
-     --set-secrets FMCSA_API_KEY=FMCSA_API_KEY:latest
-   ```
+This approach is more secure as it avoids exposing sensitive values in your deployment history.
